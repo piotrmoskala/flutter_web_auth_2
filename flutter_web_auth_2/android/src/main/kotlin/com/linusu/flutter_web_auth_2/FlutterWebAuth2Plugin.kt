@@ -50,7 +50,7 @@ class FlutterWebAuth2Plugin(
                 val keepAliveIntent = Intent(context, KeepAliveService::class.java)
 
                 intent.intent.addFlags(options["intentFlags"] as Int)
-                intent.intent.putExtra("android.support.customtabs.extra.KEEP_ALIVE", keepAliveIntent)
+                //intent.intent.putExtra("android.support.customtabs.extra.KEEP_ALIVE", keepAliveIntent)
 
                 val targetPackage = findTargetBrowserPackageName(options)
                 if (targetPackage != null) {
