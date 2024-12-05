@@ -8,6 +8,8 @@ import android.os.Build
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 
+import android.webkit.CookieManager
+
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BinaryMessenger
 import io.flutter.plugin.common.MethodCall
@@ -48,6 +50,9 @@ class FlutterWebAuth2Plugin(
                 callbacks[callbackUrlScheme] = resultCallback
                 val intent = CustomTabsIntent.Builder().build()
                 val keepAliveIntent = Intent(context, KeepAliveService::class.java)
+                
+                CookieManager.getInstance().removeAllCookies(null)
+                CookieManager.getInstance().flush()
 
                 intent.intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 intent.intent.addFlags(options["intentFlags"] as Int)
