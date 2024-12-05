@@ -145,7 +145,7 @@ class FlutterWebAuth2Plugin(
         return value == packageName
     }
 
-    private fun startOAuth2Flow(authUrl: String, redirectUri: String) {
+    private fun startOAuth2Flow(authUrl: String, redirectUri: String, result: Result) {
         val webView = WebView(context!!)
         // Configure WebView settings
         val webSettings = webView.settings
@@ -163,7 +163,7 @@ class FlutterWebAuth2Plugin(
                 val url = request?.url.toString()
                 if (url.startsWith(redirectUri)) {
                     // Handle the redirect and extract the authorization code or token
-                    handleRedirect(url)
+                    handleRedirect(result, webView, url)
                     return true
                 }
                 return false
@@ -174,7 +174,7 @@ class FlutterWebAuth2Plugin(
         webView.loadUrl(authUrl)
     }
 
-    private fun handleRedirect(url: String) {
+    private fun handleRedirect(result: Result, webView: WebView, url: String) {
         // Extract the authorization code or token from the URL
         val uri = Uri.parse(url)
         val authorizationCode = uri.getQueryParameter("code")
