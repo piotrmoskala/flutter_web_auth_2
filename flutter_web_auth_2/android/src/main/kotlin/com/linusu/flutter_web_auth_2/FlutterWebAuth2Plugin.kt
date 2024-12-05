@@ -8,6 +8,7 @@ import android.os.Build
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import android.webkit.WebSettings
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
 
@@ -49,7 +50,7 @@ class FlutterWebAuth2Plugin(
                 val options = call.argument<Map<String, Any>>("options")!!
 
                 callbacks[callbackUrlScheme] = resultCallback
-                startOAuth2Flow(url.toString(), callbackUrlScheme)
+                startOAuth2Flow(resultCallback,url.toString(), callbackUrlScheme)
 
                 // val targetPackage = findTargetBrowserPackageName(options)
                 // if (targetPackage != null) {
