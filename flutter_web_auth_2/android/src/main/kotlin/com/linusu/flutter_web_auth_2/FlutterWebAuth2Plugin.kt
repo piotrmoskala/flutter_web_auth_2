@@ -5,10 +5,11 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
+import android.webkit.WebResourceRequest
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.browser.customtabs.CustomTabsClient
 import androidx.browser.customtabs.CustomTabsIntent
-
-import android.webkit.CookieManager
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BinaryMessenger
@@ -48,15 +49,7 @@ class FlutterWebAuth2Plugin(
                 val options = call.argument<Map<String, Any>>("options")!!
 
                 callbacks[callbackUrlScheme] = resultCallback
-                val intent = CustomTabsIntent.Builder().build()
-                val keepAliveIntent = Intent(context, KeepAliveService::class.java)
-                
-                CookieManager.getInstance().removeAllCookies(null)
-                CookieManager.getInstance().flush()
-
-                intent.intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-                intent.intent.addFlags(options["intentFlags"] as Int)
-                //intent.intent.putExtra("android.support.customtabs.extra.KEEP_ALIVE", keepAliveIntent)
+                startOAuth2Flow(url.toString(), callbackUrlScheme)
 
                 val targetPackage = findTargetBrowserPackageName(options)
                 if (targetPackage != null) {
@@ -150,6 +143,50 @@ class FlutterWebAuth2Plugin(
             true
         )
         return value == packageName
+    }
+
+    private fun startOAuth2Flow(authUrl: String, redirectUri: String) {
+        val webView = WebView(context!!)
+        // Configure WebView settings
+        val webSettings = webView.settings
+        webSettings.javaScriptEnabled = true
+        webSettings.domStorageEnabled = false
+        webSettings.cacheMode = WebSettings.LOAD_NO_CACHE
+
+        // Clear cookies and cache
+        webView.clearCache(true)
+        webView.clearHistory()
+
+        // Set a WebViewClient to handle redirects
+        webView.webViewClient = object : WebViewClient() {
+            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                val url = request?.url.toString()
+                if (url.startsWith(redirectUri)) {
+                    // Handle the redirect and extract the authorization code or token
+                    handleRedirect(url)
+                    return true
+                }
+                return false
+            }
+        }
+
+        // Load the OAuth2 authorization URL
+        webView.loadUrl(authUrl)
+    }
+
+    private fun handleRedirect(url: String) {
+        // Extract the authorization code or token from the URL
+        val uri = Uri.parse(url)
+        val authorizationCode = uri.getQueryParameter("code")
+
+        // Exchange the authorization code for an access token
+        // Implement your token exchange logic here
+
+        // Notify the result back to Flutter
+        // You might want to use a MethodChannel to send the result back
+        result?.success(url)
+        //close webview
+        webView.destroy()
     }
 
 }
