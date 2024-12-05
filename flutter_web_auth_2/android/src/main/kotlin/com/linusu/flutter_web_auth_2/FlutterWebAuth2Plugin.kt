@@ -49,6 +49,7 @@ class FlutterWebAuth2Plugin(
                 val intent = CustomTabsIntent.Builder().build()
                 val keepAliveIntent = Intent(context, KeepAliveService::class.java)
 
+                intent.intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
                 intent.intent.addFlags(options["intentFlags"] as Int)
                 //intent.intent.putExtra("android.support.customtabs.extra.KEEP_ALIVE", keepAliveIntent)
 
