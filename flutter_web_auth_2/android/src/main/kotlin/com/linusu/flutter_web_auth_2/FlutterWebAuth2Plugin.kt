@@ -51,11 +51,11 @@ class FlutterWebAuth2Plugin(
                 callbacks[callbackUrlScheme] = resultCallback
                 startOAuth2Flow(url.toString(), callbackUrlScheme)
 
-                val targetPackage = findTargetBrowserPackageName(options)
-                if (targetPackage != null) {
-                    intent.intent.setPackage(targetPackage)
-                }
-                intent.launchUrl(context!!, url)
+                // val targetPackage = findTargetBrowserPackageName(options)
+                // if (targetPackage != null) {
+                //     intent.intent.setPackage(targetPackage)
+                // }
+                // intent.launchUrl(context!!, url)
             }
 
             "cleanUpDanglingCalls" -> {
