@@ -1,7 +1,7 @@
 name: flutter_web_auth_2_example
 description: Demonstrates how to use the flutter_web_auth_2 plugin.
 version: 1.0.0+1
-publish_to: 'none'
+publish_to: "none"
 
 environment:
   sdk: ">=2.15.0 <4.0.0"
@@ -17,20 +17,19 @@ dependencies:
   desktop_webview_window: ^0.2.3
   flutter:
     sdk: flutter
-  flutter_web_auth_2: ^4.0.1
+  flutter_web_auth_2:
+    path: ../
 
 dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:
     sdk: flutter
 
-
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
 
 # The following section is specific to Flutter packages.
 flutter:
-
   # The following line ensures that the Material Icons font is
   # included with your application, so that you can use the icons in
   # the material Icons class.

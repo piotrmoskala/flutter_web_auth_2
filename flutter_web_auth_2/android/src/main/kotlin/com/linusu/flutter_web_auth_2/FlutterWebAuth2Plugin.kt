@@ -1,16 +1,12 @@
 package com.linusu.flutter_web_auth_2
 
 import android.content.Context
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
-import android.webkit.WebResourceRequest
-import android.webkit.WebView
-import android.webkit.WebViewClient
-import android.webkit.WebSettings
-import androidx.browser.customtabs.CustomTabsClient
-import androidx.browser.customtabs.CustomTabsIntent
+import androidx.browser.customtabs.*
 
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.plugin.common.BinaryMessenger
@@ -19,12 +15,86 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 
+import android.os.Bundle
+import android.provider.Browser
+import androidx.browser.customtabs.CustomTabsCallback
+import androidx.browser.customtabs.CustomTabColorSchemeParams
+
 class FlutterWebAuth2Plugin(
-    private var context: Context? = null,
-    private var channel: MethodChannel? = null
+    private var context: Context? = null, private var channel: MethodChannel? = null
 ) : MethodCallHandler, FlutterPlugin {
     companion object {
         val callbacks = mutableMapOf<String, Result>()
+    }
+
+    private var customTabsClient: CustomTabsClient? = null
+    private var customTabsSession: CustomTabsSession? = null
+    private var url: Uri? = null
+    private var callbackUrlScheme: String? = null
+    private var options: Map<String, Any>? = null
+    private var resultCallback: Result? = null
+
+    var connection: CustomTabsServiceConnection? = object : CustomTabsServiceConnection() {
+        override fun onCustomTabsServiceConnected(name: ComponentName, client: CustomTabsClient) {
+            customTabsClient = client.apply {
+                warmup(0)  // Warm up the browser process
+            }
+            println("Binding custom tabs service done")
+            // Create new session
+            customTabsSession = customTabsClient?.newSession(customTabsCallback)
+            launchCustomTabs()
+            unbindCustomTabsService()
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            customTabsClient = null
+            println("Binding custom tabs service disconnected")
+        }
+    }
+
+    private val customTabsCallback = object : CustomTabsCallback() {
+        override fun onNavigationEvent(navigationEvent: Int, extras: Bundle?) {
+            println("onNavigationEvent: $navigationEvent")
+            when (navigationEvent) {
+                ACTIVITY_LAYOUT_STATE_BOTTOM_SHEET -> {
+                    //unbindCustomTabsService()
+                }
+                NAVIGATION_FINISHED -> {
+                    // Tab finished loading
+                    println("Tab finished loading")
+                }
+
+                TAB_HIDDEN -> {
+                    // Tab was hidden (user switched away)
+                    println("Tab was hidden")
+                }
+
+                TAB_SHOWN -> {
+                    // Tab was shown again
+                    println("Tab was shown again")
+                }
+
+                NAVIGATION_FAILED -> {
+                    // Navigation failed
+                    println("Navigation failed")
+                }
+            }
+        }
+    }
+
+    private fun unbindCustomTabsService() {
+        connection?.let { conn ->
+            context?.let { ctx ->
+                try {
+                    println("Unbinding custom tabs service")
+                    ctx.unbindService(conn)
+                    //connection = null
+
+                } catch (e: IllegalArgumentException) {
+                    println("Service wasn't bound")
+                }
+            }
+        }
     }
 
     private fun initInstance(messenger: BinaryMessenger, context: Context) {
@@ -38,6 +108,7 @@ class FlutterWebAuth2Plugin(
     }
 
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        unbindCustomTabsService()
         context = null
         channel = null
     }
@@ -45,45 +116,20 @@ class FlutterWebAuth2Plugin(
     override fun onMethodCall(call: MethodCall, resultCallback: Result) {
         when (call.method) {
             "authenticate" -> {
-                val url = Uri.parse(call.argument("url"))
-                val callbackUrlScheme = call.argument<String>("callbackUrlScheme")!!
-                val options = call.argument<Map<String, Any>>("options")!!
+                this.resultCallback = resultCallback
+                url = Uri.parse(call.argument("url"))
+                callbackUrlScheme = call.argument<String>("callbackUrlScheme")!!
+                options = call.argument<Map<String, Any>>("options")!!
 
-                callbacks[callbackUrlScheme] = resultCallback
-               val builder = CustomTabsIntent.Builder().apply {
-                    setDefaultColorSchemeParams(
-                        CustomTabColorSchemeParams.Builder()
-                            .setToolbarColor(ContextCompat.getColor(context, R.color.your_color))
-                            .build()
+                println("Binding custom tabs service")
+
+                connection?.let {
+                    CustomTabsClient.bindCustomTabsService(
+                        context!!,
+                        CustomTabsClient.getPackageName(context!!, null) ?: "com.android.chrome",
+                        it
                     )
-                }
-
-                // Clear session cookies and history
-                val headers = Bundle().apply {
-                    putString("Clear-Data", "true")
-                }
-
-                // Create and configure the intent
-                val customTabsIntent = builder.build().apply {
-                    intent.putExtra(Browser.EXTRA_HEADERS, headers)
-                    
-                    // Optional: Add flags to prevent history
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
-                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    
-                }
-                CustomTabsClient.connectAndInitialize(context, packageName)?.newSession(CustomTabsCallback())
-
-                // Clear data when closing
-                customTabsIntent.intent.putExtra("android.intent.extra.CLEAR_WHEN_TASK_RESET", true)
-
-                // Launch with clean session    
-                customTabsIntent.launchUrl(context!!, url)
-                // val targetPackage = findTargetBrowserPackageName(options)
-                // if (targetPackage != null) {
-                //     intent.intent.setPackage(targetPackage)
-                // }
-                // intent.launchUrl(context!!, url)
+                } ?: println("Connection is null")
             }
 
             "cleanUpDanglingCalls" -> {
@@ -98,6 +144,32 @@ class FlutterWebAuth2Plugin(
         }
     }
 
+    private fun launchCustomTabs() {
+        println("Creating custom tabs intent")
+        callbacks[callbackUrlScheme!!] = resultCallback!!
+        // Clear session cookies and history
+        val headers = Bundle().apply {
+            putString("Clear-Data", "true")
+        }
+        val builder = CustomTabsIntent.Builder(customTabsSession)
+        // Create and configure the intent
+        val customTabsIntent = builder.build().apply {
+            intent.putExtra(Browser.EXTRA_HEADERS, headers)
+
+            // Optional: Add flags to prevent history
+            intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+        }
+
+
+        // Clear data when closing
+        customTabsIntent.intent.putExtra("android.intent.extra.CLEAR_WHEN_TASK_RESET", true)
+
+        // Launch with clean session
+        customTabsIntent.launchUrl(context!!, url!!)
+    }
+
     /**
      * Find Support CustomTabs Browser.
      *
@@ -108,8 +180,8 @@ class FlutterWebAuth2Plugin(
      * 4. Installed Browser
      */
     private fun findTargetBrowserPackageName(options: Map<String, Any>): String? {
-        @Suppress("UNCHECKED_CAST")
-        val customTabsPackageOrder = (options["customTabsPackageOrder"] as Iterable<String>?) ?: emptyList()
+        @Suppress("UNCHECKED_CAST") val customTabsPackageOrder =
+            (options["customTabsPackageOrder"] as Iterable<String>?) ?: emptyList()
         // Check target browser
         var targetPackage = customTabsPackageOrder.firstOrNull { isSupportCustomTabs(it) }
         if (targetPackage != null) {
@@ -117,7 +189,8 @@ class FlutterWebAuth2Plugin(
         }
 
         // Check default browser
-        val defaultBrowserSupported = CustomTabsClient.getPackageName(context!!, emptyList<String>()) != null
+        val defaultBrowserSupported =
+            CustomTabsClient.getPackageName(context!!, emptyList<String>()) != null
         if (defaultBrowserSupported) {
             return null;
         }
@@ -143,78 +216,33 @@ class FlutterWebAuth2Plugin(
             packageManager.queryIntentActivities(activityIntent, 0)
         }
 
-        val allBrowser = viewIntentHandlers.map { it.activityInfo.packageName }.sortedWith(compareBy {
-            if (setOf(
-                    "com.android.chrome",
-                    "com.chrome.beta",
-                    "com.chrome.dev",
-                    "com.microsoft.emmx"
-                ).contains(it)
-            ) {
-                return@compareBy -1
-            }
+        val allBrowser =
+            viewIntentHandlers.map { it.activityInfo.packageName }.sortedWith(compareBy {
+                if (setOf(
+                        "com.android.chrome",
+                        "com.chrome.beta",
+                        "com.chrome.dev",
+                        "com.microsoft.emmx"
+                    ).contains(it)
+                ) {
+                    return@compareBy -1
+                }
 
-            // Firefox default is not enabled, must enable in the browser settings.
-            if (setOf("org.mozilla.firefox").contains(it)) {
-                return@compareBy 1
-            }
-            return@compareBy 0
-        })
+                // Firefox default is not enabled, must enable in the browser settings.
+                if (setOf("org.mozilla.firefox").contains(it)) {
+                    return@compareBy 1
+                }
+                return@compareBy 0
+            })
 
         return allBrowser
     }
 
     private fun isSupportCustomTabs(packageName: String): Boolean {
         val value = CustomTabsClient.getPackageName(
-            context!!,
-            arrayListOf(packageName),
-            true
+            context!!, arrayListOf(packageName), true
         )
         return value == packageName
-    }
-
-    private fun startOAuth2Flow(authUrl: String, redirectUri: String, result: Result) {
-        val webView = WebView(context!!)
-        // Configure WebView settings
-        val webSettings = webView.settings
-        webSettings.javaScriptEnabled = true
-        webSettings.domStorageEnabled = false
-        webSettings.cacheMode = WebSettings.LOAD_NO_CACHE
-
-        // Clear cookies and cache
-        webView.clearCache(true)
-        webView.clearHistory()
-
-        // Set a WebViewClient to handle redirects
-        webView.webViewClient = object : WebViewClient() {
-            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
-                val url = request?.url.toString()
-                if (url.startsWith(redirectUri)) {
-                    // Handle the redirect and extract the authorization code or token
-                    handleRedirect(result, webView, url)
-                    return true
-                }
-                return false
-            }
-        }
-
-        // Load the OAuth2 authorization URL
-        webView.loadUrl(authUrl)
-    }
-
-    private fun handleRedirect(result: Result, webView: WebView, url: String) {
-        // Extract the authorization code or token from the URL
-        val uri = Uri.parse(url)
-        val authorizationCode = uri.getQueryParameter("code")
-
-        // Exchange the authorization code for an access token
-        // Implement your token exchange logic here
-
-        // Notify the result back to Flutter
-        // You might want to use a MethodChannel to send the result back
-        result?.success(url)
-        //close webview
-        webView.destroy()
     }
 
 }
