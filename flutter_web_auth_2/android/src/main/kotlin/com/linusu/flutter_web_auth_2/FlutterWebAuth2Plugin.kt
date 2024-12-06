@@ -50,8 +50,35 @@ class FlutterWebAuth2Plugin(
                 val options = call.argument<Map<String, Any>>("options")!!
 
                 callbacks[callbackUrlScheme] = resultCallback
-                startOAuth2Flow(resultCallback,url.toString(), callbackUrlScheme)
+               val builder = CustomTabsIntent.Builder().apply {
+                    setDefaultColorSchemeParams(
+                        CustomTabColorSchemeParams.Builder()
+                            .setToolbarColor(ContextCompat.getColor(context, R.color.your_color))
+                            .build()
+                    )
+                }
 
+                // Clear session cookies and history
+                val headers = Bundle().apply {
+                    putString("Clear-Data", "true")
+                }
+
+                // Create and configure the intent
+                val customTabsIntent = builder.build().apply {
+                    intent.putExtra(Browser.EXTRA_HEADERS, headers)
+                    
+                    // Optional: Add flags to prevent history
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NO_HISTORY)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    
+                }
+                CustomTabsClient.connectAndInitialize(context, packageName)?.newSession(CustomTabsCallback())
+
+                // Clear data when closing
+                customTabsIntent.intent.putExtra("android.intent.extra.CLEAR_WHEN_TASK_RESET", true)
+
+                // Launch with clean session    
+                customTabsIntent.launchUrl(context!!, url)
                 // val targetPackage = findTargetBrowserPackageName(options)
                 // if (targetPackage != null) {
                 //     intent.intent.setPackage(targetPackage)
